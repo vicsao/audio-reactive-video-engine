@@ -1,0 +1,6 @@
+librosa
+numpy
+Pillow
+tqdm
+moviepy
+opencv-python
