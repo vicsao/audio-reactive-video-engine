@@ -26,7 +26,7 @@ A powerful, all-in-one Python pipeline designed for independent artists. It auto
 
 1.  **Clone the Repo**
     ```bash
-    git clone [https://github.com/vicsao/audio-reactive-video-engine.git](https://github.com/vicsao/audio-reactive-video-engine.git)
+    git clone https://github.com/vicsao/audio-reactive-video-engine.git
     cd audio-reactive-video-engine
     ```
 
@@ -51,3 +51,35 @@ The script expects the following structure:
 ├── main.py              # The Engine
 ├── test_assets/         # INPUT: Drop .mp3/.wav and images here
 └── batch_renders/       # OUTPUT: Videos and Cover Art appear here
+```
+
+---
+
+## 🛠️ Usage
+
+1.  **Prepare Assets:**
+    * Place your audio file (`Song Name.wav` or `.mp3`) in `test_assets/`.
+    * Place a matching image (`Song Name.jpg`) in `test_assets/`.
+    * (Optional) Add a lyric file (`Song Name.lrc`).
+
+2.  **Run the Script:**
+    ```bash
+    python main.py
+    ```
+
+3.  **Get Results:**
+    * **Video:** `batch_renders/Song Name_MASTER.mp4`
+    * **Cover Art:** `batch_renders/Song Name_COVERART.jpg`
+
+---
+
+## ⚙️ Configuration
+
+You can tweak the constants at the top of `main.py`:
+* `FPS`: Default is 30. Set to 60 for smoother motion (increases render time).
+* `TEST_MODE`: Set to `True` to render only 15 seconds for testing. Set to `False` for the full song.
+* `USE_MULTIPROCESSING`: Set to `True` to render multiple videos simultaneously.
+
+---
+
+**Author:** VinCreationz
