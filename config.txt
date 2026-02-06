@@ -1,15 +1,15 @@
 # ==============================================
-# Video Generator Configuration File
+# Video Generator Configuration File (v11.5)
 # Lines starting with '#' are comments ignored by the script.
 # ==============================================
 
 # --- RENDER SETTINGS ---
 # True = Generates 20s previews (fast). False = Generates full length videos.
-TEST_MODE=False
+TEST_MODE=True
 
 # True = Uses randomly cropped/panned images with blurred backgrounds.
 # False = Uses static, full-screen images.
-RANDOM_CROP_IMAGES=True
+RANDOM_CROP_IMAGES=False
 
 # --- BRANDING ---
 # The name that appears below the main song title.
@@ -17,3 +17,8 @@ ARTIST_NAME=VinCreationz
 
 # The text that appears in the bottom right corner throughout the video.
 WATERMARK_TEXT=VinCreationz
+
+# --- LOCALIZATION & FONTS (New in v11.5) ---
+# Path to the .ttf font file that supports Chinese (Unicode) characters.
+# The script expects this file for dual-language cover art.
+CHINESE_FONT_PATH=msyhbd.ttc
