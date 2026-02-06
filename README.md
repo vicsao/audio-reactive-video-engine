@@ -1,8 +1,15 @@
 # 🎵 VinCreationz Audio-Reactive Video Engine
 
-**Current Version:** v10.3 (Production)
+**Current Version:** v11.0 (Production / Gold Master)
 
 A powerful, all-in-one Python pipeline designed for independent artists. It automatically generates 1080p audio-reactive music videos for YouTube AND professional 3000px cover art for streaming services (DistroKid/Spotify/Apple Music) in a single click.
+
+## 🚀 New in v11.0
+* **External Configuration:** Control settings via `config.txt` without touching code.
+* **Creative Crop Engine:** Automatically turns static images into dynamic, panning visuals with blurred backgrounds.
+* **Smart Text Layout:** Titles and subtitles automatically adjust position to avoid collisions.
+* **Multi-line Support:** Handles long song titles and parenthetical "Remix" titles intelligently.
+* **Visual Effects:** Includes "Difference" shadow blending and dynamic zoom.
 
 ## ✨ Key Features
 
@@ -10,14 +17,14 @@ A powerful, all-in-one Python pipeline designed for independent artists. It auto
 * **Audio Reactivity:** Detects BPM and beat drops to apply "Pulse" effects (Zoom + Brightness Flash) automatically.
 * **Dynamic Visualizer:** Generates a spectrum analyzer (frequency bars) overlaid on the video.
 * **Ken Burns Effect:** Smoothly pans and zooms across static artwork to create movement.
-* **Lyric Support:** Automatically parses `.lrc` files to display karaoke-style lyrics.
-* **Smart Watermarking:** Auto-colors the "VinCreationz" watermark (black or white) based on background brightness.
+* **Lyric Support:** Automatically parses `.lrc` files to display karaoke-style lyrics (supports 5s offset).
+* **Smart Watermarking:** Auto-colors the watermark (black or white) based on background brightness.
 * **High Quality:** Renders in 1080p (30fps) using NVENC GPU acceleration for speed.
 
 ### 🎨 Cover Art Generator (DistroKid/Streaming)
 * **Auto-Formatting:** Takes your raw background image and crops/upscales it to a perfect **3000x3000px** square.
-* **Text Overlay:** Automatically pulls the **Song Title** from the filename and overlays it with a drop shadow.
-* **Branding:** Adds the "VinCreationz" watermark to the cover art automatically.
+* **Smart Text Overlay:** Automatically handles line breaks for long titles or "(Remix)" tags and centers them perfectly.
+* **Branding:** Adds the Artist Name watermark to the cover art automatically.
 * **Format:** Saves as a high-quality JPEG (98% quality) ready for upload.
 
 ---
@@ -26,7 +33,7 @@ A powerful, all-in-one Python pipeline designed for independent artists. It auto
 
 1.  **Clone the Repo**
     ```bash
-    git clone https://github.com/vicsao/audio-reactive-video-engine.git
+    git clone [https://github.com/vicsao/audio-reactive-video-engine.git](https://github.com/vicsao/audio-reactive-video-engine.git)
     cd audio-reactive-video-engine
     ```
 
@@ -49,6 +56,7 @@ The script expects the following structure:
 /Project_Root
 │
 ├── main.py              # The Engine
+├── config.txt           # Settings File (NEW)
 ├── test_assets/         # INPUT: Drop .mp3/.wav and images here
 └── batch_renders/       # OUTPUT: Videos and Cover Art appear here
 ```
@@ -62,23 +70,31 @@ The script expects the following structure:
     * Place a matching image (`Song Name.jpg`) in `test_assets/`.
     * (Optional) Add a lyric file (`Song Name.lrc`).
 
-2.  **Run the Script:**
+2.  **Configure:**
+    * Open `config.txt` to change settings without editing code:
+        * `TEST_MODE=True` (20s render) or `False` (Full Song)
+        * `ARTIST_NAME` and `WATERMARK_TEXT`
+        * `RANDOM_CROP_IMAGES` (Dynamic Camera vs Static)
+
+3.  **Run the Script:**
     ```bash
     python main.py
     ```
 
-3.  **Get Results:**
+4.  **Get Results:**
     * **Video:** `batch_renders/Song Name_MASTER.mp4`
     * **Cover Art:** `batch_renders/Song Name_COVERART.jpg`
 
 ---
 
-## ⚙️ Configuration
-
-You can tweak the constants at the top of `main.py`:
-* `FPS`: Default is 30. Set to 60 for smoother motion (increases render time).
-* `TEST_MODE`: Set to `True` to render only 15 seconds for testing. Set to `False` for the full song.
-* `USE_MULTIPROCESSING`: Set to `True` to render multiple videos simultaneously.
+## 📄 Configuration (`config.txt`)
+Manage your settings without editing the script:
+```ini
+TEST_MODE=True
+RANDOM_CROP_IMAGES=True
+ARTIST_NAME=VinCreationz
+WATERMARK_TEXT=VinCreationz
+```
 
 ---
 
