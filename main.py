@@ -50,12 +50,13 @@ USE_MULTIPROCESSING = True
 MAX_PROCESSES = 2 
 
 # ==========================================
-# 3. CREATIVE CROP ENGINE (Difference Shadow)
+# 3. CREATIVE CROP ENGINE (v10.10 - Stable Rectangles)
 # ==========================================
 def creative_crop_composite(img_pil):
     """
     Creates a 1920x1080 frame with blurred background.
-    Randomly crops foreground (Square/Wide/Tall/Diamond).
+    Randomly crops foreground (Square/Wide/Tall).
+    Diamond Mode removed for stability.
     Applies a "Difference Blend" drop shadow.
     """
     # --- 1. Create Background (Heavy Blur) ---
@@ -73,15 +74,13 @@ def creative_crop_composite(img_pil):
     enhancer = PIL.ImageEnhance.Brightness(bg_img)
     bg_img = enhancer.enhance(0.6) # Keep background slightly dark so difference blend pops
 
-    # --- 2. Random Crop Logic & Masking ---
-    # Modes: 1=Square, 2=Wide, 3=Tall, 4=Diamond
-    mode = random.randint(1, 4)
-    # mode = 4 # Uncomment to test only diamonds
+    # --- 2. Random Crop Logic (Rectangles Only) ---
+    # Modes: 1=Square, 2=Wide, 3=Tall
+    mode = random.randint(1, 3) 
     
-    if mode == 1: target_size = (900, 900)
-    elif mode == 2: target_size = (1200, 800)
-    elif mode == 3: target_size = (600, 950)
-    elif mode == 4: target_size = (850, 850)
+    if mode == 1: target_size = (900, 900)   # Square
+    elif mode == 2: target_size = (1200, 800) # Wide
+    elif mode == 3: target_size = (600, 950)  # Tall
 
     t_w, t_h = target_size
     orig_w, orig_h = img_pil.size
@@ -100,12 +99,8 @@ def creative_crop_composite(img_pil):
     fg_img = img_pil.crop((left, top, left + new_w, top + new_h))
     fg_img = fg_img.resize(target_size, PIL.Image.LANCZOS)
 
-    # Create Mask representing the shape
-    mask = PIL.Image.new("L", target_size, 255) # Default rectangle opaque
-    if mode == 4: # Diamond Mask
-        draw = PIL.ImageDraw.Draw(mask)
-        mask = PIL.Image.new("L", target_size, 0) # Start transparent
-        draw.polygon([(t_w/2, 0), (t_w, t_h/2), (t_w/2, t_h), (0, t_h/2)], fill=255)
+    # Create Solid Mask (Rectangles don't need transparency maps)
+    mask = PIL.Image.new("L", target_size, 255) 
     
     # Calculate center position
     pos_x = int((1920 - t_w) / 2)
@@ -126,7 +121,7 @@ def creative_crop_composite(img_pil):
     bg_with_shadow = PIL.ImageChops.difference(bg_img, shadow_layer)
     
     # --- 4. Final Composite ---
-    bg_with_shadow.paste(fg_img, (pos_x, pos_y), mask)
+    bg_with_shadow.paste(fg_img, (pos_x, pos_y)) # No mask needed for rectangles, keeps it simpler
 
     return np.array(bg_with_shadow)
 
