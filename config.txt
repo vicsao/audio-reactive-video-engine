@@ -1,0 +1,19 @@
+# ==============================================
+# Video Generator Configuration File
+# Lines starting with '#' are comments ignored by the script.
+# ==============================================
+
+# --- RENDER SETTINGS ---
+# True = Generates 20s previews (fast). False = Generates full length videos.
+TEST_MODE=False
+
+# True = Uses randomly cropped/panned images with blurred backgrounds.
+# False = Uses static, full-screen images.
+RANDOM_CROP_IMAGES=True
+
+# --- BRANDING ---
+# The name that appears below the main song title.
+ARTIST_NAME=VinCreationz
+
+# The text that appears in the bottom right corner throughout the video.
+WATERMARK_TEXT=VinCreationz

@@ -1,13 +1,13 @@
 """
 ==============================================================================
-SCRIPT: VinCreationz Batch Video Generator (v10.9 - Production)
+SCRIPT: VinCreationz Batch Video Generator (v11.0 - Config File Edition)
 AUTHOR: VinCreationz + Gemini
 PURPOSE: Automates 1080p music videos AND 3000px DistroKid Cover Art.
 
-UPDATES (v10.9):
-- TWEAKED: Improved Text Collision Logic.
-  - Video: Added 30px padding between Title and Subtitle blocks.
-  - Cover Art: Added 30px line spacing (leading) within multi-line titles.
+UPDATES (v11.0):
+- MAJOR UPGRADE: Settings moved to external 'config.txt' file.
+- No more hardcoded "VinCreationz" branding.
+- TEST_MODE and RANDOM_CROP_IMAGES controlled via config.txt.
 ==============================================================================
 """
 
@@ -27,6 +27,44 @@ import cv2  # The "Heavy Lifter": Advanced computer vision library
 from multiprocessing import Pool  # The "Multi-tasker": Allows using multiple CPU cores
 
 # ==========================================
+# 0. CONFIGURATION LOADER (New in v11.0)
+# ==========================================
+def load_config(config_path="config.txt"):
+    # Default settings serve as a fallback if config.txt is missing or broken
+    config = {
+        "TEST_MODE": True,
+        "RANDOM_CROP_IMAGES": False,
+        "ARTIST_NAME": "Some Artist",
+        "WATERMARK_TEXT": "Some Artist"
+    }
+    try:
+        with open(config_path, 'r') as f:
+            print(f"[Config] Reading settings from {config_path}...")
+            for line in f:
+                # Skip comments (#) and empty lines
+                if line.strip().startswith("#") or not line.strip():
+                    continue
+                key, value = line.strip().split("=", 1)
+                key = key.strip()
+                value = value.strip()
+
+                # Parse text booleans into real Python booleans
+                if value.lower() == "true":
+                    config[key] = True
+                elif value.lower() == "false":
+                    config[key] = False
+                else:
+                    config[key] = value # Keep as string otherwise
+    except FileNotFoundError:
+        print(f"[Config] Warning: {config_path} not found. Using internal defaults.")
+    except Exception as e:
+        print(f"[Config] Error reading config: {e}. Using internal defaults.")
+    return config
+
+# Load Settings Immediately
+CONFIG = load_config()
+
+# ==========================================
 # 1. SYSTEM CONFIGURATION
 # ==========================================
 FPS = 30 
@@ -36,12 +74,11 @@ INPUT_FOLDER = "test_assets"
 OUTPUT_FOLDER = "batch_renders"
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# TEST_MODE: True = 20s render. False = Full song.
-TEST_MODE = True  
-
-# RANDOM_CROP: True = Randomly crops images (Square/Wide/Tall/Diamond) over blurred background.
-#              False = Standard full-screen crop (Old behavior).
-RANDOM_CROP_IMAGES = True
+# Settings loaded from CONFIG dictionary
+TEST_MODE = CONFIG["TEST_MODE"]
+RANDOM_CROP_IMAGES = CONFIG["RANDOM_CROP_IMAGES"]
+ARTIST_NAME = CONFIG["ARTIST_NAME"]
+WATERMARK_TEXT = CONFIG["WATERMARK_TEXT"]
 
 # ==========================================
 # 2. MULTIPROCESSING (SPEED)
@@ -50,15 +87,9 @@ USE_MULTIPROCESSING = True
 MAX_PROCESSES = 2 
 
 # ==========================================
-# 3. CREATIVE CROP ENGINE (v10.10 - Stable Rectangles)
+# 3. CREATIVE CROP ENGINE (v10.10 Stable Rectangles)
 # ==========================================
 def creative_crop_composite(img_pil):
-    """
-    Creates a 1920x1080 frame with blurred background.
-    Randomly crops foreground (Square/Wide/Tall).
-    Diamond Mode removed for stability.
-    Applies a "Difference Blend" drop shadow.
-    """
     # --- 1. Create Background (Heavy Blur) ---
     bg_w, bg_h = img_pil.size
     scale = max(1920 / bg_w, 1080 / bg_h)
@@ -72,10 +103,9 @@ def creative_crop_composite(img_pil):
     # Heavy blur and darken slightly
     bg_img = bg_img.filter(PIL.ImageFilter.GaussianBlur(radius=30))
     enhancer = PIL.ImageEnhance.Brightness(bg_img)
-    bg_img = enhancer.enhance(0.6) # Keep background slightly dark so difference blend pops
+    bg_img = enhancer.enhance(0.6)
 
     # --- 2. Random Crop Logic (Rectangles Only) ---
-    # Modes: 1=Square, 2=Wide, 3=Tall
     mode = random.randint(1, 3) 
     
     if mode == 1: target_size = (900, 900)   # Square
@@ -99,7 +129,7 @@ def creative_crop_composite(img_pil):
     fg_img = img_pil.crop((left, top, left + new_w, top + new_h))
     fg_img = fg_img.resize(target_size, PIL.Image.LANCZOS)
 
-    # Create Solid Mask (Rectangles don't need transparency maps)
+    # Create Solid Mask
     mask = PIL.Image.new("L", target_size, 255) 
     
     # Calculate center position
@@ -107,7 +137,7 @@ def creative_crop_composite(img_pil):
     pos_y = int((1080 - t_h) / 2)
 
     # --- 3. Create Difference Drop Shadow ---
-    shadow_offset = (25, 25) # Offset right and down
+    shadow_offset = (25, 25)
     shadow_blur_radius = 30
 
     shadow_mask_canvas = PIL.Image.new("L", (1920, 1080), 0)
@@ -121,12 +151,12 @@ def creative_crop_composite(img_pil):
     bg_with_shadow = PIL.ImageChops.difference(bg_img, shadow_layer)
     
     # --- 4. Final Composite ---
-    bg_with_shadow.paste(fg_img, (pos_x, pos_y)) # No mask needed for rectangles, keeps it simpler
+    bg_with_shadow.paste(fg_img, (pos_x, pos_y))
 
     return np.array(bg_with_shadow)
 
 # ==========================================
-# 4. COVER ART GENERATOR (Smart Split + Spacing)
+# 4. COVER ART GENERATOR (Uses Config Text)
 # ==========================================
 def create_streaming_cover_art(source_image_path, base_name):
     try:
@@ -146,15 +176,16 @@ def create_streaming_cover_art(source_image_path, base_name):
         draw = PIL.ImageDraw.Draw(img_final)
         width, height = img_final.size
         
-        # --- TEXT PREP (SMART SPLIT) ---
+        # --- TEXT PREP ---
         raw_title = base_name.replace("_", " ").replace("-", " ").title()
         if "(" in raw_title:
-            song_title = raw_title.replace("(", "\n(") # Force new line
+            song_title = raw_title.replace("(", "\n(")
         else:
             song_title = raw_title
             
-        watermark_text = "VinCreationz"
-        LINE_SPACING = 30 # Pixels between lines of title
+        # USE CONFIG VALUE
+        watermark_text = WATERMARK_TEXT
+        LINE_SPACING = 30
         
         # Font Sizing
         title_size = int(width * 0.1) 
@@ -168,9 +199,8 @@ def create_streaming_cover_art(source_image_path, base_name):
             title_font = PIL.ImageFont.load_default()
             wm_font = PIL.ImageFont.load_default()
 
-        # Text Positioning (Multi-line Aware + Spacing)
+        # Text Positioning
         try:
-            # Important: Include spacing in bbox calculation for accurate centering
             bbox = draw.multiline_textbbox((0, 0), song_title, font=title_font, align='center', spacing=LINE_SPACING)
             t_w = bbox[2] - bbox[0]
             t_h = bbox[3] - bbox[1]
@@ -191,7 +221,7 @@ def create_streaming_cover_art(source_image_path, base_name):
 
         shadow_offset = int(width * 0.003)
         
-        # Draw Title (Multiline + Spacing)
+        # Draw Title
         draw.multiline_text((t_x + shadow_offset, t_y + shadow_offset), song_title, font=title_font, fill=(0,0,0), align='center', spacing=LINE_SPACING)
         draw.multiline_text((t_x, t_y), song_title, font=title_font, fill=(255,255,255), align='center', spacing=LINE_SPACING)
         
@@ -218,7 +248,7 @@ def get_slideshow_frame(t, images, total_duration, transition_time=2.0):
     t_local = t % duration_per_slide
     
     def render_slide(img, progress):
-        # We only zoom 5% if using random crop because the background is already blurred/complex
+        # Zoom amount controlled by config value
         zoom_amt = 0.05 if RANDOM_CROP_IMAGES else 0.1 
         scale = 1.0 + (zoom_amt * progress)
         h, w = img.shape[:2]
@@ -343,8 +373,8 @@ def process_file(audio_name, show_bar=False):
         for p in image_paths:
             img = PIL.Image.open(p).convert('RGB')
             
+            # Uses Config Value
             if RANDOM_CROP_IMAGES:
-                # NEW LOGIC: Random Crop + Blur Background + Shadow
                 final_array = creative_crop_composite(img)
                 loaded_images.append(final_array)
             else:
@@ -359,6 +389,7 @@ def process_file(audio_name, show_bar=False):
                 loaded_images.append(np.array(img))
 
         duration = librosa.get_duration(path=audio_path)
+        # Uses Config Value
         audio_limit = 20 if TEST_MODE else duration
         total_duration = audio_limit + 5 
 
@@ -403,28 +434,23 @@ def process_file(audio_name, show_bar=False):
 
         bg_clip = VideoClip(video_generator, duration=total_duration)
         
-        # --- TEXT OVERLAYS (SMART SPLIT MODE + PADDING) ---
-        # 1. Prepare Title Text
+        # --- TEXT OVERLAYS (Uses Config Values) ---
         clean_title = base_name.upper()
         if "(" in clean_title:
             clean_title = clean_title.replace("(", "\n(")
 
-        # 2. Create Title Clip
         title = TextClip(clean_title, fontsize=110, color='white', font='Arial-Bold', 
                          method='caption', size=(1800, None), 
                          stroke_color='black', stroke_width=5)
         
-        # 3. Calculate Height & Smart Stack
         title_top_y = 400
         title_height = title.size[1] 
-        
-        # Position Subtitle: Changed from -10 to +30 for more padding
         sub_y_pos = title_top_y + title_height + 30
         
-        # 4. Apply Positions
         title = title.set_duration(5).set_position(('center', title_top_y)).fx(vfx.fadeout, 1)
 
-        sub = TextClip("VinCreationz", fontsize=50, color='white', font='Arial-Bold',
+        # Uses Config Artist Name
+        sub = TextClip(ARTIST_NAME, fontsize=50, color='white', font='Arial-Bold',
                        stroke_color='black', stroke_width=2) \
               .set_duration(5).set_position(('center', sub_y_pos)).fx(vfx.fadeout, 1)
 
@@ -432,7 +458,8 @@ def process_file(audio_name, show_bar=False):
         wm_brightness = np.mean(wm_region)
         wm_color = 'black' if wm_brightness > 140 else 'white'
         
-        mark = TextClip("VinCreationz", fontsize=50, color=wm_color, font='Arial-Bold') \
+        # Uses Config Watermark Text
+        mark = TextClip(WATERMARK_TEXT, fontsize=50, color=wm_color, font='Arial-Bold') \
                .set_start(5).set_duration(total_duration - 5) \
                .set_position((1540, 1000)).fx(vfx.fadein, 1)
 
@@ -477,8 +504,9 @@ if __name__ == "__main__":
         print("No MP3/WAV files found in input folder!")
     else:
         start_time = time.time()
-        print(f"\n[VinCreationz] Batch Started at: {datetime.datetime.now().strftime('%I:%M:%S %p')}")
-        print(f"Queue: {total} files | Creative Crop: {RANDOM_CROP_IMAGES}")
+        # Uses Config Artist Name in logs
+        print(f"\n[{ARTIST_NAME}] Batch Started at: {datetime.datetime.now().strftime('%I:%M:%S %p')}")
+        print(f"Queue: {total} files | Mode: {'TEST' if TEST_MODE else 'FULL'} | Creative Crop: {RANDOM_CROP_IMAGES}")
         print("="*40)
 
         if total == 1:
@@ -492,6 +520,7 @@ if __name__ == "__main__":
 
         end_time = time.time()
         print("\n" + "="*40)
-        print("      VINCREATIONZ PRODUCTION REPORT      ")
+        # Uses Config Artist Name in report header
+        print(f"      {ARTIST_NAME.upper()} PRODUCTION REPORT      ")
         print(f"Total Duration: {str(datetime.timedelta(seconds=int(end_time - start_time)))}")
         print("="*40 + "\n")
