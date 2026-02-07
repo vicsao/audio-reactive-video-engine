@@ -1,10 +1,9 @@
 """
 ==============================================================================
-SCRIPT: VinCreationz Batch Video Generator (v11.9.4 - Social Ready)
+SCRIPT: VinCreationz Batch Video Generator (v12.0 - International)
 AUTHOR: VinCreationz + Gemini
 PURPOSE: Automates 1080p music videos AND 3000px DistroKid Cover Art.
-         Fixed: Unicode rendering, auto-purge, aggressive lyric cleaning,
-         and LinkedIn color-space compatibility (yuv420p).
+         New: Adaptive Dual-Language (Stacked) Subtitle Engine.
 ==============================================================================
 """
 
@@ -32,7 +31,7 @@ def load_config(config_path="config.txt"):
         "RANDOM_CROP_IMAGES": False,
         "ARTIST_NAME": "VinCreationz",
         "WATERMARK_TEXT": "VinCreationz",
-        "CHINESE_FONT_PATH": "msyhbd.ttc" # Local Bold variant
+        "CHINESE_FONT_PATH": "msyhbd.ttc"
     }
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -136,8 +135,7 @@ def parse_lrc(lrc_path):
                 if line.startswith('['):
                     try:
                         time_tag, text = line[1:9], line[10:].strip()
-                        # Clean lyrics for professional MV look
-                        for char in ["—", "–", "—", "―", "-", "─", "。", "，"]:
+                        for char in ["—", "–", "―", "-", "─", "。", "，"]:
                             text = text.replace(char, "")
                         text = text.strip() 
                         m, s = time_tag.split(':')
@@ -149,15 +147,44 @@ def parse_lrc(lrc_path):
     except Exception as e: print(f"LRC Error: {e}")
     return lyrics
 
-def create_lyric_clip(lyrics, duration):
+def create_lyric_clip(lrc_master, lrc_en=None, duration=0):
+    """Adaptive Dual-Layer Engine with Auto-Language Detection"""
     clips = []
-    for line in lyrics:
+    
+    def contains_chinese(text):
+        """Returns True if the string contains any Chinese characters"""
+        return any('\u4e00' <= char <= '\u9fff' for char in text)
+
+    for i, line in enumerate(lrc_master):
         if not line['text'] or line['start'] > duration: continue
-        txt = TextClip(line['text'], fontsize=80, color='white', font=CHINESE_FONT, 
-                       method='caption', size=(1600, None), align='center', 
-                       stroke_color='black', stroke_width=4)
-        txt = txt.set_start(line['start']).set_end(line['end']).set_position(('center', 'center'))
-        clips.append(txt)
+        
+        # --- DYNAMIC FONT SELECTION ---
+        # If text is English-only, use Arial-Bold to fix spacing
+        # If text has Chinese, use the defined CHINESE_FONT (msyhbd.ttc)
+        current_font = CHINESE_FONT if contains_chinese(line['text']) else 'Arial-Bold'
+        
+        # Dual-Layer Mode
+        if lrc_en and i < len(lrc_en):
+            zh_txt = TextClip(line['text'], fontsize=80, color='white', font=current_font, 
+                               method='caption', size=(1600, None), align='center', 
+                               stroke_color='black', stroke_width=4)
+            zh_txt = zh_txt.set_start(line['start']).set_end(line['end']).set_position(('center', 450))
+            clips.append(zh_txt)
+            
+            # Translations are almost always English
+            en_txt = TextClip(lrc_en[i]['text'], fontsize=45, color='yellow', font='Arial-Bold', 
+                               method='caption', size=(1600, None), align='center', 
+                               stroke_color='black', stroke_width=2)
+            en_txt = en_txt.set_start(line['start']).set_end(line['end']).set_position(('center', 600))
+            clips.append(en_txt)
+        
+        # Single-Layer Mode (Standard English Songs)
+        else:
+            txt = TextClip(line['text'], fontsize=80, color='white', font=current_font, 
+                            method='caption', size=(1600, None), align='center', 
+                            stroke_color='black', stroke_width=4)
+            txt = txt.set_start(line['start']).set_end(line['end']).set_position(('center', 'center'))
+            clips.append(txt)
     return clips
 
 def create_streaming_cover_art(source_image_path, base_name):
@@ -181,8 +208,8 @@ def create_streaming_cover_art(source_image_path, base_name):
         wm_w = draw.textlength(WATERMARK_TEXT, font=w_font)
         draw.text(((3000 - wm_w) / 2, 2700), WATERMARK_TEXT, font=w_font, fill="white")
         img_final.save(output_path, "JPEG", quality=95)
-        print(f"   [Cover Art] SUCCESS: {output_path}")
-    except Exception as e: print(f"   [Cover Art Error]: {e}")
+        print(f"    [Cover Art] SUCCESS: {output_path}")
+    except Exception as e: print(f"    [Cover Art Error]: {e}")
 
 # ==========================================
 # 3. PROCESSOR
@@ -193,7 +220,6 @@ def process_file(audio_name, show_bar=False):
     try:
         audio_path = os.path.join(INPUT_FOLDER, audio_name)
         base_name = os.path.splitext(audio_name)[0]
-        # Auto-purge stale renders
         for suffix in ["_MASTER.mp4", "_COVERART.jpg", "_thumb.jpg"]:
             f = os.path.join(OUTPUT_FOLDER, base_name + suffix)
             if os.path.exists(f): os.remove(f)
@@ -249,14 +275,17 @@ def process_file(audio_name, show_bar=False):
         viz_clip = VideoClip(make_viz, duration=total_duration).fx(vfx.mask_color, color=[255, 0, 255], thr=50, s=5).set_position(('center', 900))
         
         layers = [bg_clip, viz_clip, title, sub, mark]
-        lrc_data = parse_lrc(os.path.join(INPUT_FOLDER, base_name + ".lrc"))
-        if lrc_data: layers.extend(create_lyric_clip(lrc_data, total_duration))
+        
+        # Dual-Language Check
+        lrc_master = parse_lrc(os.path.join(INPUT_FOLDER, f"{base_name}.lrc"))
+        lrc_en = parse_lrc(os.path.join(INPUT_FOLDER, f"{base_name}_en.lrc"))
+        if lrc_master:
+            layers.extend(create_lyric_clip(lrc_master, lrc_en, total_duration))
         
         final = CompositeVideoClip(layers, size=(1920, 1080))
         audio = concatenate_audioclips([AudioFileClip(audio_path).subclip(0, 0.1).volumex(0).set_duration(5), AudioFileClip(audio_path).subclip(0, audio_limit)])
         PIL.Image.fromarray(final.get_frame(2.0)).save(os.path.join(OUTPUT_FOLDER, f"{base_name}_thumb.jpg"), "JPEG", quality=90)
         
-        # Color space fix for Social Media/LinkedIn
         final.set_audio(audio).write_videofile(os.path.join(OUTPUT_FOLDER, f"{base_name}_MASTER.mp4"), fps=30, codec='h264_nvenc', threads=os.cpu_count(), ffmpeg_params=['-preset', 'p7', '-b:v', '20M', '-pix_fmt', 'yuv420p'], logger='bar' if show_bar else None)
         return True
     except Exception as e: print(f"Error: {e}"); return False
