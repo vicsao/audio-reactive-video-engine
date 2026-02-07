@@ -1,11 +1,16 @@
 # ==============================================
-# Video Generator Configuration File (v11.5)
-# Lines starting with '#' are comments ignored by the script.
+# Video Generator Configuration File (v12.0)
+# VinCreationz International Edition
 # ==============================================
 
 # --- RENDER SETTINGS ---
-# True = Generates 20s previews (fast). False = Generates full length videos.
+# True = Generates 20s previews (fast). 
+# False = Generates full length videos (MASTER build).
 TEST_MODE=True
+
+# NEW v12.5 Toggle: True = Process video. 
+# False = Skip video, generate only Art/LRC.
+RENDER_VIDEO=True
 
 # True = Uses randomly cropped/panned images with blurred backgrounds.
 # False = Uses static, full-screen images.
@@ -18,7 +23,8 @@ ARTIST_NAME=VinCreationz
 # The text that appears in the bottom right corner throughout the video.
 WATERMARK_TEXT=VinCreationz
 
-# --- LOCALIZATION & FONTS (New in v11.5) ---
-# Path to the .ttf font file that supports Chinese (Unicode) characters.
-# The script expects this file for dual-language cover art.
+# --- LOCALIZATION & FONTS (Updated v12.0) ---
+# Path to the font file that supports Chinese (Unicode) characters.
+# The script uses this for Mandarin lyrics and dual-language cover art.
+# v12.0 Auto-Detect: Script will default to 'Arial-Bold' if no Chinese is found.
 CHINESE_FONT_PATH=msyhbd.ttc

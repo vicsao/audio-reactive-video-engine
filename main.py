@@ -1,9 +1,9 @@
 """
 ==============================================================================
-SCRIPT: VinCreationz Batch Video Generator (v12.0 - International)
+SCRIPT: VinCreationz Batch Video Generator (v12.7 - International)
 AUTHOR: VinCreationz + Gemini
 PURPOSE: Automates 1080p music videos AND 3000px DistroKid Cover Art.
-         New: Adaptive Dual-Language (Stacked) Subtitle Engine.
+         v12.7 Fix: Restored missing FX function & optimized Thumbnail flow.
 ==============================================================================
 """
 
@@ -15,6 +15,7 @@ import time
 import datetime
 import glob
 import random
+import re 
 from tqdm import tqdm
 from moviepy.editor import VideoClip, AudioFileClip, CompositeVideoClip, TextClip, concatenate_audioclips
 import moviepy.video.fx.all as vfx 
@@ -28,6 +29,7 @@ from multiprocessing import Pool
 def load_config(config_path="config.txt"):
     config = {
         "TEST_MODE": True,
+        "RENDER_VIDEO": True,
         "RANDOM_CROP_IMAGES": False,
         "ARTIST_NAME": "VinCreationz",
         "WATERMARK_TEXT": "VinCreationz",
@@ -38,7 +40,8 @@ def load_config(config_path="config.txt"):
             for line in f:
                 if line.strip().startswith("#") or not line.strip(): continue
                 key, value = line.strip().split("=", 1)
-                config[key.strip()] = True if value.strip().lower() == "true" else False if value.strip().lower() == "false" else value.strip()
+                val = value.strip().lower()
+                config[key.strip()] = True if val == "true" else False if val == "false" else value.strip()
     return config
 
 CONFIG = load_config()
@@ -46,6 +49,7 @@ CHINESE_FONT = CONFIG["CHINESE_FONT_PATH"]
 WATERMARK_TEXT = CONFIG["WATERMARK_TEXT"]
 ARTIST_NAME = CONFIG["ARTIST_NAME"]
 TEST_MODE = CONFIG["TEST_MODE"]
+RENDER_VIDEO = CONFIG["RENDER_VIDEO"]
 
 change_settings({"IMAGEMAGICK_BINARY": r"C:\Program Files\ImageMagick-7.1.2-Q16\magick.exe"})
 INPUT_FOLDER, OUTPUT_FOLDER = "test_assets", "batch_renders"
@@ -110,6 +114,7 @@ def get_slideshow_frame(t, images, total_duration, transition_time=2.0):
         current_frame = cv2.addWeighted(current_frame, 1.0 - alpha, render_slide(images[slide_idx + 1], 0.0), alpha, 0)
     return current_frame
 
+# --- RESTORED FUNCTION ---
 def apply_dynamic_fx(base_frame, t, onset_env, duration, recipe):
     idx = int(t * (len(onset_env) / duration))
     pulse = onset_env[idx] if idx < len(onset_env) else 0
@@ -122,10 +127,35 @@ def apply_dynamic_fx(base_frame, t, onset_env, duration, recipe):
         cy, cx = (resized.shape[0]-h)//2, (resized.shape[1]-w)//2
         frame = resized[cy:cy+h, cx:cx+w]
     return np.clip(frame, 0, 255).astype(np.uint8)
+# -------------------------
 
 # ==========================================
 # 2. HELPERS & COVER ART
 # ==========================================
+def sanitize_and_overwrite_lrc(lrc_path):
+    """v12.4: Smart Regex-based fragment merging."""
+    if not os.path.exists(lrc_path): return
+    cleaned_lines = []
+    timestamp_pattern = re.compile(r"\[\d{2}:\d{2}\.\d{2}\]") 
+    try:
+        with open(lrc_path, 'r', encoding='utf-8-sig') as f:
+            raw_lines = f.readlines()
+        for line in raw_lines:
+            clean_line = line.strip()
+            if not clean_line: continue
+            text_only = re.sub(r"\[\d{2}:\d{2}\.\d{2}\]", "", clean_line).strip()
+            if timestamp_pattern.search(clean_line):
+                if cleaned_lines and (len(text_only) < 12 or text_only.startswith('(')):
+                    cleaned_lines[-1] = f"{cleaned_lines[-1]} {text_only}"
+                else:
+                    cleaned_lines.append(clean_line)
+            elif cleaned_lines:
+                cleaned_lines[-1] = f"{cleaned_lines[-1]} {clean_line}"
+        with open(lrc_path, 'w', encoding='utf-8-sig') as f:
+            f.write("\n".join(cleaned_lines) + "\n")
+        print(f"    [LRC Sanitized] SUCCESS: {os.path.basename(lrc_path)}")
+    except Exception as e: print(f"    [Cleanup Error] {e}")
+
 def parse_lrc(lrc_path):
     lyrics = []
     if not os.path.exists(lrc_path): return []
@@ -148,37 +178,23 @@ def parse_lrc(lrc_path):
     return lyrics
 
 def create_lyric_clip(lrc_master, lrc_en=None, duration=0):
-    """Adaptive Dual-Layer Engine with Auto-Language Detection"""
     clips = []
-    
     def contains_chinese(text):
-        """Returns True if the string contains any Chinese characters"""
         return any('\u4e00' <= char <= '\u9fff' for char in text)
-
     for i, line in enumerate(lrc_master):
         if not line['text'] or line['start'] > duration: continue
-        
-        # --- DYNAMIC FONT SELECTION ---
-        # If text is English-only, use Arial-Bold to fix spacing
-        # If text has Chinese, use the defined CHINESE_FONT (msyhbd.ttc)
         current_font = CHINESE_FONT if contains_chinese(line['text']) else 'Arial-Bold'
-        
-        # Dual-Layer Mode
         if lrc_en and i < len(lrc_en):
             zh_txt = TextClip(line['text'], fontsize=80, color='white', font=current_font, 
                                method='caption', size=(1600, None), align='center', 
                                stroke_color='black', stroke_width=4)
             zh_txt = zh_txt.set_start(line['start']).set_end(line['end']).set_position(('center', 450))
             clips.append(zh_txt)
-            
-            # Translations are almost always English
             en_txt = TextClip(lrc_en[i]['text'], fontsize=45, color='yellow', font='Arial-Bold', 
                                method='caption', size=(1600, None), align='center', 
                                stroke_color='black', stroke_width=2)
             en_txt = en_txt.set_start(line['start']).set_end(line['end']).set_position(('center', 600))
             clips.append(en_txt)
-        
-        # Single-Layer Mode (Standard English Songs)
         else:
             txt = TextClip(line['text'], fontsize=80, color='white', font=current_font, 
                             method='caption', size=(1600, None), align='center', 
@@ -188,6 +204,7 @@ def create_lyric_clip(lrc_master, lrc_en=None, duration=0):
     return clips
 
 def create_streaming_cover_art(source_image_path, base_name):
+    """v12.5 Tweak: Larger and higher watermark."""
     try:
         output_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_COVERART.jpg")
         img = PIL.Image.open(source_image_path).convert('RGB')
@@ -195,20 +212,33 @@ def create_streaming_cover_art(source_image_path, base_name):
         left, top = (img.width - min_side) / 2, (img.height - min_side) / 2
         img_final = img.crop((left, top, left + min_side, top + min_side)).resize((3000, 3000), PIL.Image.LANCZOS)
         draw = PIL.ImageDraw.Draw(img_final)
-        t_size, w_size = int(3000 * 0.09), int(3000 * 0.04)
+        
+        t_size = int(3000 * 0.09)
         t_font = PIL.ImageFont.truetype(CHINESE_FONT, t_size)
-        w_font = PIL.ImageFont.truetype(CHINESE_FONT, w_size)
+        
         raw_title = base_name.replace("_", " ").upper()
-        lines = [line.strip() for line in raw_title.replace("(", "\n(").split("\n")]
-        for i, line in enumerate(lines):
+        words, wrapped_lines, cur_line = raw_title.split(), [], ""
+        for word in words:
+            test = f"{cur_line} {word}".strip()
+            if draw.textlength(test, font=t_font) <= 2600: cur_line = test
+            else:
+                wrapped_lines.append(cur_line)
+                cur_line = word
+        wrapped_lines.append(cur_line)
+
+        start_y = 1500 - ((len(wrapped_lines) * (t_size + 40)) // 2)
+        for i, line in enumerate(wrapped_lines):
             w = draw.textlength(line, font=t_font)
-            x, y = (3000 - w) / 2, 1200 + (i * (t_size + 50))
+            x, y = (3000 - w) / 2, start_y + (i * (t_size + 40))
             draw.text((x + 10, y + 10), line, font=t_font, fill="black")
             draw.text((x, y), line, font=t_font, fill="white")
-        wm_w = draw.textlength(WATERMARK_TEXT, font=w_font)
-        draw.text(((3000 - wm_w) / 2, 2700), WATERMARK_TEXT, font=w_font, fill="white")
+
+        wm_font = PIL.ImageFont.truetype(CHINESE_FONT, int(3000 * 0.06))
+        wm_w = draw.textlength(WATERMARK_TEXT, font=wm_font)
+        draw.text(((3000 - wm_w) / 2, 2650), WATERMARK_TEXT, font=wm_font, fill="white")
+        
         img_final.save(output_path, "JPEG", quality=95)
-        print(f"    [Cover Art] SUCCESS: {output_path}")
+        print(f"    [Cover Art] SUCCESS: {os.path.basename(output_path)}")
     except Exception as e: print(f"    [Cover Art Error]: {e}")
 
 # ==========================================
@@ -220,14 +250,23 @@ def process_file(audio_name, show_bar=False):
     try:
         audio_path = os.path.join(INPUT_FOLDER, audio_name)
         base_name = os.path.splitext(audio_name)[0]
-        for suffix in ["_MASTER.mp4", "_COVERART.jpg", "_thumb.jpg"]:
-            f = os.path.join(OUTPUT_FOLDER, base_name + suffix)
-            if os.path.exists(f): os.remove(f)
+        
+        # 1. Cleanup LRCs
+        lrc_master_path = os.path.join(INPUT_FOLDER, f"{base_name}.lrc")
+        lrc_en_path = os.path.join(INPUT_FOLDER, f"{base_name}_en.lrc")
+        if os.path.exists(lrc_master_path): sanitize_and_overwrite_lrc(lrc_master_path)
+        if os.path.exists(lrc_en_path): sanitize_and_overwrite_lrc(lrc_en_path)
 
+        # 2. Cover Art
         potential_files = glob.glob(os.path.join(INPUT_FOLDER, base_name + "*"))
         image_paths = sorted([f for f in potential_files if os.path.splitext(f)[1].lower() in ['.jpg', '.png', '.jpeg', '.webp']])
-        if not image_paths: return False
-        create_streaming_cover_art(image_paths[0], base_name)
+        if image_paths: create_streaming_cover_art(image_paths[0], base_name)
+        else: return False
+
+        # --- VIDEO PREP ---
+        for suffix in ["_MASTER.mp4", "_thumb.jpg"]:
+            f = os.path.join(OUTPUT_FOLDER, base_name + suffix)
+            if os.path.exists(f): os.remove(f)
 
         loaded_images = []
         for p in image_paths:
@@ -245,7 +284,6 @@ def process_file(audio_name, show_bar=False):
         y, sr = librosa.load(audio_path, duration=audio_limit)
         bpm = int(np.round(librosa.beat.beat_track(y=y, sr=sr)[0]))
         stat = PIL.ImageStat.Stat(PIL.Image.fromarray(loaded_images[0]))
-        bright = sum(stat.mean) / 3 
         recipe = {"zoom": 0.04, "expo": 0.2} if bpm >= 95 else {"zoom": 0.02, "expo": 0.1}
 
         c_onset = librosa.onset.onset_strength(y=y, sr=sr)
@@ -270,22 +308,28 @@ def process_file(audio_name, show_bar=False):
         bg_clip = VideoClip(lambda t: apply_dynamic_fx(get_slideshow_frame(t, loaded_images, total_duration), t, onset_env, total_duration, recipe), duration=total_duration)
         title_text = base_name.upper().replace("(", "\n(") if "(" in base_name else base_name.upper()
         title = TextClip(title_text, fontsize=110, color='white', font=CHINESE_FONT, method='caption', size=(1800, None), stroke_color='black', stroke_width=5).set_duration(5).set_position(('center', 400)).fx(vfx.fadeout, 1)
-        sub = TextClip(ARTIST_NAME, fontsize=50, color='white', font=CHINESE_FONT, stroke_color='black', stroke_width=2).set_duration(5).set_position(('center', 400 + title.size[1] + 30)).fx(vfx.fadeout, 1)
+        sub = TextClip(ARTIST_NAME, fontsize=75, color='white', font=CHINESE_FONT, stroke_color='black', stroke_width=3).set_duration(5).set_position(('center', 400 + title.size[1] + 30)).fx(vfx.fadeout, 1)
         mark = TextClip(WATERMARK_TEXT, fontsize=50, color='white', font=CHINESE_FONT).set_start(5).set_duration(total_duration-5).set_position((1540, 1000)).fx(vfx.fadein, 1)
         viz_clip = VideoClip(make_viz, duration=total_duration).fx(vfx.mask_color, color=[255, 0, 255], thr=50, s=5).set_position(('center', 900))
         
         layers = [bg_clip, viz_clip, title, sub, mark]
-        
-        # Dual-Language Check
-        lrc_master = parse_lrc(os.path.join(INPUT_FOLDER, f"{base_name}.lrc"))
-        lrc_en = parse_lrc(os.path.join(INPUT_FOLDER, f"{base_name}_en.lrc"))
-        if lrc_master:
-            layers.extend(create_lyric_clip(lrc_master, lrc_en, total_duration))
+        lrc_master = parse_lrc(lrc_master_path)
+        lrc_en = parse_lrc(lrc_en_path)
+        if lrc_master: layers.extend(create_lyric_clip(lrc_master, lrc_en, total_duration))
         
         final = CompositeVideoClip(layers, size=(1920, 1080))
-        audio = concatenate_audioclips([AudioFileClip(audio_path).subclip(0, 0.1).volumex(0).set_duration(5), AudioFileClip(audio_path).subclip(0, audio_limit)])
-        PIL.Image.fromarray(final.get_frame(2.0)).save(os.path.join(OUTPUT_FOLDER, f"{base_name}_thumb.jpg"), "JPEG", quality=90)
         
+        # 3. Generate Thumbnail (Fast)
+        PIL.Image.fromarray(final.get_frame(2.0)).save(os.path.join(OUTPUT_FOLDER, f"{base_name}_thumb.jpg"), "JPEG", quality=90)
+        print(f"    [THUMBNAIL] Generated: {base_name}_thumb.jpg")
+
+        # 4. Check Skip Toggle (NOW it stops here if False)
+        if not RENDER_VIDEO:
+            print(f"    [SKIP] MP4 rendering skipped (RENDER_VIDEO=False)")
+            return True
+
+        # 5. Render Full Video (Slow)
+        audio = concatenate_audioclips([AudioFileClip(audio_path).subclip(0, 0.1).volumex(0).set_duration(5), AudioFileClip(audio_path).subclip(0, audio_limit)])
         final.set_audio(audio).write_videofile(os.path.join(OUTPUT_FOLDER, f"{base_name}_MASTER.mp4"), fps=30, codec='h264_nvenc', threads=os.cpu_count(), ffmpeg_params=['-preset', 'p7', '-b:v', '20M', '-pix_fmt', 'yuv420p'], logger='bar' if show_bar else None)
         return True
     except Exception as e: print(f"Error: {e}"); return False
