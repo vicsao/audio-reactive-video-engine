@@ -1,9 +1,10 @@
 """
 ==============================================================================
-SCRIPT: VinCreationz Batch Video Generator (v12.7 - International)
+SCRIPT: VinCreationz Batch Video Generator (v13.0 - International)
 AUTHOR: VinCreationz + Gemini
-PURPOSE: Automates 1080p music videos AND 3000px DistroKid Cover Art.
-         v12.7 Fix: Restored missing FX function & optimized Thumbnail flow.
+PURPOSE: Automates 1080p music videos, 3000px DistroKid Cover Art,
+         AND Suno "Safe-Zone" Cover Art.
+         v13.0 Fix: Narrower text wrap & larger watermark for Suno.
 ==============================================================================
 """
 
@@ -114,7 +115,6 @@ def get_slideshow_frame(t, images, total_duration, transition_time=2.0):
         current_frame = cv2.addWeighted(current_frame, 1.0 - alpha, render_slide(images[slide_idx + 1], 0.0), alpha, 0)
     return current_frame
 
-# --- RESTORED FUNCTION ---
 def apply_dynamic_fx(base_frame, t, onset_env, duration, recipe):
     idx = int(t * (len(onset_env) / duration))
     pulse = onset_env[idx] if idx < len(onset_env) else 0
@@ -127,7 +127,6 @@ def apply_dynamic_fx(base_frame, t, onset_env, duration, recipe):
         cy, cx = (resized.shape[0]-h)//2, (resized.shape[1]-w)//2
         frame = resized[cy:cy+h, cx:cx+w]
     return np.clip(frame, 0, 255).astype(np.uint8)
-# -------------------------
 
 # ==========================================
 # 2. HELPERS & COVER ART
@@ -157,6 +156,7 @@ def sanitize_and_overwrite_lrc(lrc_path):
     except Exception as e: print(f"    [Cleanup Error] {e}")
 
 def parse_lrc(lrc_path):
+    """v13.1 Fix: Preserves English dashes/hyphens, removes only Chinese punctuation."""
     lyrics = []
     if not os.path.exists(lrc_path): return []
     try:
@@ -165,8 +165,14 @@ def parse_lrc(lrc_path):
                 if line.startswith('['):
                     try:
                         time_tag, text = line[1:9], line[10:].strip()
-                        for char in ["—", "–", "―", "-", "─", "。", "，"]:
+                        
+                        # --- v13.1 BUG FIX ---
+                        # OLD: for char in ["—", "–", "―", "-", "─", "。", "，"]:
+                        # NEW: Only remove specific Chinese punctuation or weird artifacts.
+                        # We KEEP: "-", "–", "—" for English grammar (e.g. "Five-star", "it—just say")
+                        for char in ["。", "，", "─"]: 
                             text = text.replace(char, "")
+                            
                         text = text.strip() 
                         m, s = time_tag.split(':')
                         start_time = int(m) * 60 + float(s) + 5.0 
@@ -204,7 +210,7 @@ def create_lyric_clip(lrc_master, lrc_en=None, duration=0):
     return clips
 
 def create_streaming_cover_art(source_image_path, base_name):
-    """v12.5 Tweak: Larger and higher watermark."""
+    """v12.5 Tweak: Larger and higher watermark for 3000px square."""
     try:
         output_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_COVERART.jpg")
         img = PIL.Image.open(source_image_path).convert('RGB')
@@ -241,6 +247,58 @@ def create_streaming_cover_art(source_image_path, base_name):
         print(f"    [Cover Art] SUCCESS: {os.path.basename(output_path)}")
     except Exception as e: print(f"    [Cover Art Error]: {e}")
 
+def create_suno_cover_art(source_image_path, base_name):
+    """v13.0: Suno-friendly 9x16 Art with safe-zone wrapping."""
+    try:
+        target_w, target_h = 1080, 1920
+        output_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_SUNO.jpg")
+        img = PIL.Image.open(source_image_path).convert('RGB')
+
+        scale = max(target_w / img.width, target_h / img.height)
+        new_w, new_h = int(img.width * scale + 1), int(img.height * scale + 1)
+        img_resized = img.resize((new_w, new_h), PIL.Image.LANCZOS)
+        left, top = (new_w - target_w) // 2, (new_h - target_h) // 2
+        img_final = img_resized.crop((left, top, left + target_w, top + target_h))
+        draw = PIL.ImageDraw.Draw(img_final)
+
+        # --- SAFE ZONE CONFIG (v13.0 Tweaks) ---
+        t_size = int(target_w * 0.11)
+        w_size = int(target_w * 0.07) # Larger watermark (8%)
+        t_font = PIL.ImageFont.truetype(CHINESE_FONT, t_size)
+        w_font = PIL.ImageFont.truetype(CHINESE_FONT, w_size)
+
+        # Wrap Title (Narrower 650px width for safe zone)
+        raw_title = base_name.replace("_", " ").upper()
+        words, wrapped_lines, cur_line = raw_title.split(), [], ""
+        max_text_width = 650 
+        for word in words:
+            test = f"{cur_line} {word}".strip()
+            if draw.textlength(test, font=t_font) <= max_text_width: cur_line = test
+            else:
+                wrapped_lines.append(cur_line)
+                cur_line = word
+        wrapped_lines.append(cur_line)
+
+        # Calculate TOTAL block height & Center
+        title_block_h = len(wrapped_lines) * (t_size + 20)
+        total_content_h = title_block_h + 40 + w_size
+        start_y = (target_h - total_content_h) // 2
+        
+        # Draw Title & Watermark
+        for i, line in enumerate(wrapped_lines):
+            w = draw.textlength(line, font=t_font)
+            x, y = (target_w - w) // 2, start_y + (i * (t_size + 20))
+            draw.text((x + 5, y + 5), line, font=t_font, fill="black")
+            draw.text((x, y), line, font=t_font, fill="white")
+            
+        wm_w = draw.textlength(WATERMARK_TEXT, font=w_font)
+        wm_y = start_y + title_block_h + 30
+        draw.text(((target_w - wm_w) / 2, wm_y), WATERMARK_TEXT, font=w_font, fill="white")
+
+        img_final.save(output_path, "JPEG", quality=95)
+        print(f"    [Suno Art] SUCCESS: {os.path.basename(output_path)}")
+    except Exception as e: print(f"    [Suno Art Error]: {e}")
+
 # ==========================================
 # 3. PROCESSOR
 # ==========================================
@@ -251,23 +309,26 @@ def process_file(audio_name, show_bar=False):
         audio_path = os.path.join(INPUT_FOLDER, audio_name)
         base_name = os.path.splitext(audio_name)[0]
         
-        # 1. Cleanup LRCs
+        # 1. Cleanup ALL old files first
+        for suffix in ["_MASTER.mp4", "_thumb.jpg", "_COVERART.jpg", "_SUNO.jpg"]:
+            f = os.path.join(OUTPUT_FOLDER, base_name + suffix)
+            if os.path.exists(f): os.remove(f)
+
+        # 2. Cleanup LRCs
         lrc_master_path = os.path.join(INPUT_FOLDER, f"{base_name}.lrc")
         lrc_en_path = os.path.join(INPUT_FOLDER, f"{base_name}_en.lrc")
         if os.path.exists(lrc_master_path): sanitize_and_overwrite_lrc(lrc_master_path)
         if os.path.exists(lrc_en_path): sanitize_and_overwrite_lrc(lrc_en_path)
 
-        # 2. Cover Art
+        # 3. Generate Cover Arts
         potential_files = glob.glob(os.path.join(INPUT_FOLDER, base_name + "*"))
         image_paths = sorted([f for f in potential_files if os.path.splitext(f)[1].lower() in ['.jpg', '.png', '.jpeg', '.webp']])
-        if image_paths: create_streaming_cover_art(image_paths[0], base_name)
+        if image_paths:
+            create_streaming_cover_art(image_paths[0], base_name) # DistroKid
+            create_suno_cover_art(image_paths[0], base_name)      # Suno Safe-Zone
         else: return False
 
-        # --- VIDEO PREP ---
-        for suffix in ["_MASTER.mp4", "_thumb.jpg"]:
-            f = os.path.join(OUTPUT_FOLDER, base_name + suffix)
-            if os.path.exists(f): os.remove(f)
-
+        # 4. Prepare Video Assets
         loaded_images = []
         for p in image_paths:
             img = PIL.Image.open(p).convert('RGB')
@@ -319,16 +380,15 @@ def process_file(audio_name, show_bar=False):
         
         final = CompositeVideoClip(layers, size=(1920, 1080))
         
-        # 3. Generate Thumbnail (Fast)
+        # 5. Generate Thumbnail
         PIL.Image.fromarray(final.get_frame(2.0)).save(os.path.join(OUTPUT_FOLDER, f"{base_name}_thumb.jpg"), "JPEG", quality=90)
         print(f"    [THUMBNAIL] Generated: {base_name}_thumb.jpg")
 
-        # 4. Check Skip Toggle (NOW it stops here if False)
+        # 6. Skip or Render
         if not RENDER_VIDEO:
             print(f"    [SKIP] MP4 rendering skipped (RENDER_VIDEO=False)")
             return True
 
-        # 5. Render Full Video (Slow)
         audio = concatenate_audioclips([AudioFileClip(audio_path).subclip(0, 0.1).volumex(0).set_duration(5), AudioFileClip(audio_path).subclip(0, audio_limit)])
         final.set_audio(audio).write_videofile(os.path.join(OUTPUT_FOLDER, f"{base_name}_MASTER.mp4"), fps=30, codec='h264_nvenc', threads=os.cpu_count(), ffmpeg_params=['-preset', 'p7', '-b:v', '20M', '-pix_fmt', 'yuv420p'], logger='bar' if show_bar else None)
         return True
