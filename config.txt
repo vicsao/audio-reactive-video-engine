@@ -1,30 +1,34 @@
 # ==============================================
-# Video Generator Configuration File (v12.0)
-# VinCreationz International Edition
+# Video Generator Configuration File (v13.1)
+# VinCreationz Production Suite
 # ==============================================
 
 # --- RENDER SETTINGS ---
-# True = Generates 20s previews (fast). 
+# True = Generates 20s previews (fast testing). 
 # False = Generates full length videos (MASTER build).
-TEST_MODE=True
+TEST_MODE=False
 
-# NEW v12.5 Toggle: True = Process video. 
-# False = Skip video, generate only Art/LRC.
+# True = Process video (MP4). 
+# False = Skip video, generate only Art/LRC/Thumbnails (Dev Mode).
 RENDER_VIDEO=True
 
-# True = Uses randomly cropped/panned images with blurred backgrounds.
-# False = Uses static, full-screen images.
-RANDOM_CROP_IMAGES=False
+# --- FUTURE MODULES (DISABLED) ---
+# GENERATE_SHORT=False
+# ADD_INTRO_SILENCE=False
+
+# --- VISUAL STYLE ---
+# True = Uses Clean Border Engine (blurred bg + 2px white border).
+# False = Uses static, full-screen image assets.
+RANDOM_CROP_IMAGES=True
 
 # --- BRANDING ---
-# The name that appears below the main song title.
+# Main artist identifier appearing below song titles on thumbnails and art.
 ARTIST_NAME=VinCreationz
 
-# The text that appears in the bottom right corner throughout the video.
+# Watermark for the bottom-right corner of the video Master.
 WATERMARK_TEXT=VinCreationz
 
-# --- LOCALIZATION & FONTS (Updated v12.0) ---
-# Path to the font file that supports Chinese (Unicode) characters.
-# The script uses this for Mandarin lyrics and dual-language cover art.
-# v12.0 Auto-Detect: Script will default to 'Arial-Bold' if no Chinese is found.
+# --- LOCALIZATION & FONTS ---
+# Path to the font file supporting Unicode/Mandarin characters.
+# REQUIRED for Suno Safe-Zone Art & Multi-language lyric stacking.
 CHINESE_FONT_PATH=msyhbd.ttc

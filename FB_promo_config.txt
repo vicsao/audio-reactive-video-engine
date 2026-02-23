@@ -1,0 +1,13 @@
+[Global]
+output_folder = FB_Promos
+font_path = msyhbd.ttc
+# set to True to burn text into video, False for clean video
+burn_text = True 
+
+[Track Info]
+audio_file = We Can Go Wherever She Like.mp3
+video_loop = AnimateDiff_VampireGirl.mp4
+start_time = 00:21
+duration = 15
+top_text = Italian 🍝 or Thai 🍛?
+bottom_text = Tag the picky eater 👇

@@ -1,6 +1,7 @@
-moviepy
+moviepy==1.0.3
 librosa
 numpy
 Pillow
 opencv-python
 tqdm
+decorator==4.4.2
