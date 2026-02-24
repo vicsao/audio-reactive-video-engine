@@ -172,6 +172,7 @@ WATERMARK_TEXT=VinCreationz
 # REQUIRED for Mandarin lyrics and Suno "Safe-Zone" Art text stacking.
 # Default: msyhbd.ttc (Microsoft YaHei Bold)
 LANGUAGE_FONT_PATH=msyhbd.ttc
+```
 
 ---
 
