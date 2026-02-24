@@ -1,34 +1,49 @@
-# ==============================================
-# Video Generator Configuration File (v13.1)
-# VinCreationz Production Suite
-# ==============================================
+# ==============================================================================
+# VinCreationz Production Suite - Configuration File v13.2
+# Optimized for NVIDIA 4070 NVENC + High-Detail Audio Visualization
+# ==============================================================================
 
-# --- RENDER SETTINGS ---
-# True = Generates 20s previews (fast testing). 
-# False = Generates full length videos (MASTER build).
-TEST_MODE=False
+# --- [ RENDER SETTINGS ] ---
 
-# True = Process video (MP4). 
-# False = Skip video, generate only Art/LRC/Thumbnails (Dev Mode).
+# TEST_MODE: Toggle between rapid prototyping and final export.
+# True  = Generates 20s previews (High it/s).
+# False = Generates Full Length Master (Slower it/s due to file size).
+TEST_MODE=True
+
+# RENDER_VIDEO: The "Master" switch.
+# True  = Full MP4 generation with 4070 NVENC acceleration.
+# False = Dev Mode. Generates only Cover Art, Suno Art, and Thumbnails (Ultra Fast).
 RENDER_VIDEO=True
 
-# --- FUTURE MODULES (DISABLED) ---
-# GENERATE_SHORT=False
-# ADD_INTRO_SILENCE=False
 
-# --- VISUAL STYLE ---
-# True = Uses Clean Border Engine (blurred bg + 2px white border).
-# False = Uses static, full-screen image assets.
-RANDOM_CROP_IMAGES=True
+# --- [ VISUAL STYLE & PERFORMANCE ] ---
 
-# --- BRANDING ---
-# Main artist identifier appearing below song titles on thumbnails and art.
+# RANDOM_CROP_IMAGES: Controls the "Ken Burns" Pan & Zoom engine.
+# True  = (PRO) Randomizes 5-point cropping (Center, TL, TR, BL, BR).
+#         Performance Cost: ~15-20% slower it/s due to per-frame CPU math.
+# False = (SPEED) Static Center-Zoom only. Highest it/s.
+RANDOM_CROP_IMAGES=False
+
+
+# --- [ BRANDING ] ---
+
+# ARTIST_NAME: Appears on Art assets and below titles in the intro/outro.
 ARTIST_NAME=VinCreationz
 
-# Watermark for the bottom-right corner of the video Master.
+# WATERMARK_TEXT: Persistent ID in the bottom-right corner (Set at t=5s).
 WATERMARK_TEXT=VinCreationz
 
-# --- LOCALIZATION & FONTS ---
-# Path to the font file supporting Unicode/Mandarin characters.
-# REQUIRED for Suno Safe-Zone Art & Multi-language lyric stacking.
-CHINESE_FONT_PATH=msyhbd.ttc
+
+# --- [ LOCALIZATION & FONTS ] ---
+
+# LANGUAGE_FONT_PATH: The Unicode/Multi-language engine.
+# Default = msyhbd.ttc (Microsoft YaHei Bold).
+# REQUIRED for Mandarin lyrics and Suno "Safe-Zone" Art text stacking.
+# Note: Re-verify path if "cannot open resource" error occurs in parallel mode.
+LANGUAGE_FONT_PATH=msyhbd.ttc
+
+
+# --- [ AUDIO VIZ PERFORMANCE ] ---
+# Note: The "Rainbow Viz" is hard-coded in v13.2.2.
+# Performance Impact: Increases CPU load significantly. 
+# Expected Throughput with 4070: ~6.0 - 9.0 it/s.
