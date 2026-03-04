@@ -224,15 +224,27 @@ def parse_lrc(lrc_path):
 def create_lyric_clip(lrc_master, lrc_en=None, duration=0):
     clips = []
     def has_zh(text): return any('\u4e00' <= char <= '\u9fff' for char in text)
+    
     for i, line in enumerate(lrc_master):
         if not line['text'] or line['start'] > duration: continue
         f = LANGUAGE_FONT if has_zh(line['text']) else 'Arial-Bold'
+        
+        # Dual Language Mode
         if lrc_en and i < len(lrc_en):
-            zh = TextClip(line['text'], fontsize=90, color='white', font=f, method='caption', size=(1600, None), align='center', stroke_color='black', stroke_width=4).set_start(line['start']).set_end(line['end']).set_position(('center', 420))
-            en = TextClip(lrc_en[i]['text'], fontsize=50, color='yellow', font='Arial-Bold', method='caption', size=(1600, None), align='center', stroke_color='black', stroke_width=2).set_start(line['start']).set_end(line['end']).set_position(('center', 580))
+            zh = TextClip(line['text'], fontsize=90, color='white', font=f, 
+                          method='caption', size=(1600, None), align='center', 
+                          stroke_color='black', stroke_width=2).set_start(line['start']).set_end(line['end']).set_position(('center', 420))
+            
+            en = TextClip(lrc_en[i]['text'], fontsize=50, color='yellow', font='Arial-Bold', 
+                          method='caption', size=(1600, None), align='center', 
+                          stroke_color='black', stroke_width=1).set_start(line['start']).set_end(line['end']).set_position(('center', 580))
             clips.extend([zh, en])
+        
+        # Single Language Mode (Main Lyrics)
         else:
-            clips.append(TextClip(line['text'], fontsize=85, color='white', font=f, method='caption', size=(1600, None), align='center', stroke_color='black', stroke_width=5).set_start(line['start']).set_end(line['end']).set_position(('center', 'center')))
+            clips.append(TextClip(line['text'], fontsize=85, color='white', font=f, 
+                                  method='caption', size=(1600, None), align='center', 
+                                  stroke_color='black', stroke_width=2).set_start(line['start']).set_end(line['end']).set_position(('center', 'center')))
     return clips
 
 def process_file_wrapper(args): return process_file(*args)
