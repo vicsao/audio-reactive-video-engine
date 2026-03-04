@@ -1,10 +1,33 @@
 """
 ==============================================================================
-SCRIPT: VinCreationz Lyric-Sync (v1.7)
-FIXES: 
-- Added 'initial_prompt' truncation (Whisper only reads the first ~200 words).
-- Added 'hallucination_filter' to strip weird repeated junk like 'érique'.
-- Forced 'compression_ratio_threshold' to stop the AI from 'dumping' text.
+VINCREATIONZ LYRIC-SYNC (v1.7) - USER GUIDE & CONFIGURATION
+==============================================================================
+
+WHAT THIS DOES:
+1. Scans the 'generate_srt' folder for music (MP3/WAV).
+2. Uses Whisper AI to "listen" and time-stamp the lyrics.
+3. Cleans out AI "hallucinations" (like 'érique' or '[Chorus]' tags).
+4. Creates a .LRC file (synced lyrics) for Suno or music players.
+5. Moves the finished audio + LRC to the 'test_assets' folder.
+
+DIRECTORY SETUP (Create these before running):
+Your_Project/
+├── lyric_sync_script.py
+└── test_assets/              <-- FINAL OUTPUTS GO HERE
+    └── generate_srt/         <-- DROP YOUR RAW FILES HERE
+
+HOW TO USE:
+1. Drop your audio file (e.g., "my_song.mp3") into 'test_assets/generate_srt/'.
+2. (Optional) Drop a text file with the same name ("my_song.txt") into the 
+   same folder. The script uses this to "prime" the AI with the right words.
+3. Run the script.
+4. Check 'test_assets/' for your synced .mp3 and .lrc files.
+
+CONFIGURATIONS:
+- INPUT_FOLDER: Where the script looks for new work.
+- DEST_FOLDER:  Where the script "ships" the finished product.
+- initial_map:  Uses the first 500 chars of your .txt to help AI accuracy.
+- TEMPERATURE:  Set to 0 for "maximum accuracy/no creativity."
 ==============================================================================
 """
 import whisper
